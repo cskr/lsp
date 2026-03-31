@@ -103,6 +103,23 @@ export def ApplyTextEdits(bnr: number, text_edits: list<dict<any>>): void
     return
   endif
 
+  # When lines are added or removed before the line the cursor is on,
+  # the cursor must be moved after the edits are applied.
+  var saved_cursor = []
+  if bnr == bufnr() # Cursor management only for current buffer
+    saved_cursor = getcurpos()
+    for edit in text_edits
+      # Ignore edit after the line the cursor is on.
+      if edit.range.start.line >= saved_cursor[1]
+        continue
+      endif
+
+      var added = edit.newText->split('\n', true)->len() - 1
+      var removed = edit.range.end.line - edit.range.start.line
+      saved_cursor[1] += added - removed
+    endfor
+  endif
+
   # if the buffer is not loaded, load it and make it a listed buffer
   :silent! bnr->bufload()
   setbufvar(bnr, '&buflisted', true)
@@ -210,6 +227,10 @@ export def ApplyTextEdits(bnr: number, text_edits: list<dict<any>>): void
 
   if dellastline
     bnr->deletebufline(bnr->getbufinfo()[0].linecount)
+  endif
+
+  if bnr == bufnr()
+    saved_cursor->setpos('.')
   endif
 enddef
 
